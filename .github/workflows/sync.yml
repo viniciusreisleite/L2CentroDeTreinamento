@@ -37,15 +37,12 @@ jobs:
         run: |
           python sync_instagram.py
 
-      - name: Salvar arquivos e limpar histórico no Git
+      - name: Salvar arquivos no Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
           rm -f cookies.txt
-          
-          git fetch origin main
-          git rebase -X theirs origin/main || git rebase --abort || true
           
           git add video_*.mp4 data.json index.html logo.png .gitignore || true
           
@@ -57,7 +54,7 @@ jobs:
       - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Enviar arquivos para o Pages
+      - name: Enviar arquivos atualizados para o Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
