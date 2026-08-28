@@ -28,7 +28,7 @@
       gap: 2.5vw;
     }
 
-    /* Coluna de Vídeo (Vertical 9:16) */
+    /* Coluna de Vídeo */
     .video-section {
       flex: 0 0 35%;
       height: 100%;
@@ -89,8 +89,6 @@
     .header-text {
       flex: 1;
     }
-    
-    /* Badge Personalizada */
     .badge {
       display: inline-block;
       background: linear-gradient(135deg, #ea580c, #f97316);
@@ -103,8 +101,6 @@
       margin-bottom: 1vh;
       box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
     }
-    
-    /* Título 'L2 CENTRO DE TREINAMENTO' */
     .header h1 {
       font-size: clamp(1.2rem, 1.8vw, 2.2rem);
       font-weight: 900;
@@ -117,7 +113,6 @@
       color: #f97316;
     }
 
-    /* Logo Transparente e Grande */
     .logo-img {
       height: clamp(85px, 14vh, 140px);
       max-width: 260px;
@@ -125,7 +120,7 @@
       filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.8));
     }
 
-    /* Área de Texto Auto-Ajustável com Fonte Branca */
+    /* Área de Texto Auto-Ajustável */
     .caption-container {
       flex: 1;
       margin-top: 2vh;
@@ -150,9 +145,8 @@
 <body>
 
   <div class="tv-container">
-    <!-- Coluna de Vídeo -->
     <div class="video-section">
-      <video id="player" autoplay playsinline muted>
+      <video id="player" autoplay playsinline muted preload="auto">
         <source id="video-source" src="video_1.mp4" type="video/mp4">
       </video>
       <div class="progress-bar-container">
@@ -160,7 +154,6 @@
       </div>
     </div>
 
-    <!-- Coluna Informativa -->
     <div class="info-section">
       <div class="header">
         <div class="header-text">
@@ -188,7 +181,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     const postId = parseInt(urlParams.get('post')) || 1;
 
-    // Busca binária para achar o tamanho de fonte ideal sem cortes
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5;
+
     function autoFitTextExact() {
       const containerW = captionContainer.clientWidth;
       const containerH = captionContainer.clientHeight;
@@ -219,9 +214,28 @@
       captionText.style.lineHeight = (optimal * 1.35) + 'px';
     }
 
+    player.addEventListener('error', () => {
+      consecutiveErrors++;
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      } else {
+        setTimeout(() => {
+          player.load();
+          player.play().catch(() => {});
+        }, 3000);
+      }
+    });
+
+    player.addEventListener('playing', () => {
+      consecutiveErrors = 0;
+    });
+
     async function loadPostData() {
+      const timestamp = new Date().getTime();
       try {
-        const res = await fetch('data.json?t=' + new Date().getTime());
+        const res = await fetch(`data.json?t=${timestamp}`);
         const posts = await res.json();
         
         const currentPost = posts.find(p => p.id === postId) || posts[0];
@@ -232,7 +246,7 @@
           autoFitTextExact();
         });
 
-        videoSource.src = currentPost.video_file;
+        videoSource.src = `${currentPost.video_file}?t=${timestamp}`;
         player.load();
         player.play().catch(e => console.log('Autoplay:', e));
       } catch (e) {
@@ -251,7 +265,7 @@
 
     player.addEventListener('ended', () => {
       player.currentTime = 0;
-      player.play();
+      player.play().catch(e => console.log('Erro ao reiniciar:', e));
     });
 
     loadPostData();
