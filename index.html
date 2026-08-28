@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mural Digital - L2 Centro de Treinamento</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    /* Fundo Preto Total / Dark Carbon */
+    body {
+      background: radial-gradient(circle at top right, #1a1a1a, #0a0a0a, #000000);
+      color: #ffffff;
+      font-family: 'Montserrat', sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+    .tv-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      padding: 3vh 2.5vw;
+      gap: 2.5vw;
+    }
+
+    /* Coluna de Vídeo (Vertical 9:16) */
+    .video-section {
+      flex: 0 0 35%;
+      height: 100%;
+      background: #000;
+      border-radius: 26px;
+      overflow: hidden;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      border: 2px solid rgba(249, 115, 22, 0.4);
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .progress-bar-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ea580c, #f97316, #fb923c);
+      transition: width 0.1s linear;
+    }
+
+    /* Coluna Informativa Dark & Orange */
+    .info-section {
+      flex: 1;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(249, 115, 22, 0.25);
+      border-radius: 26px;
+      padding: 3.5vh 3vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    /* Cabeçalho */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 25px;
+      padding-bottom: 2vh;
+      border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+    }
+    .header-text {
+      flex: 1;
+    }
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #ea580c, #f97316);
+      color: #ffffff;
+      font-size: clamp(0.75rem, 1vw, 1.05rem);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 6px 18px;
+      border-radius: 50px;
+      margin-bottom: 1vh;
+      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
+    }
+    .header h1 {
+      font-size: clamp(1.4rem, 2.2vw, 2.6rem);
+      font-weight: 900;
+      line-height: 1.2;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+    .header h1 span {
+      color: #f97316;
+    }
+
+    /* Logo Transparente e Grande */
+    .logo-img {
+      height: clamp(85px, 14vh, 140px);
+      max-width: 260px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.8));
+    }
+
+    /* Área de Texto com Auto-Ajuste e Fonte Branca */
+    .caption-container {
+      flex: 1;
+      margin-top: 2vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      height: 100%;
+    }
+    .caption-box {
+      width: 100%;
+      color: #ffffff; /* Texto 100% Branco com altíssima leitura */
+      white-space: pre-line;
+      word-break: break-word;
+      line-height: 1.45;
+      font-weight: 500;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="tv-container">
+    <!-- Coluna de Vídeo -->
+    <div class="video-section">
+      <video id="player" autoplay playsinline muted>
+        <source id="video-source" src="video_1.mp4" type="video/mp4">
+      </video>
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progress"></div>
+      </div>
+    </div>
+
+    <!-- Coluna Informativa -->
+    <div class="info-section">
+      <div class="header">
+        <div class="header-text">
+          <span class="badge">Centro de Treinamento</span>
+          <h1>L2 <span>Treinamento</span></h1>
+        </div>
+        <img src="logo.png" alt="Logo L2" class="logo-img" onerror="this.style.display='none'">
+      </div>
+
+      <div class="caption-container" id="caption-container">
+        <div class="caption-box" id="caption-text">
+          Carregando informações...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const player = document.getElementById('player');
+    const videoSource = document.getElementById('video-source');
+    const progressBar = document.getElementById('progress');
+    const captionContainer = document.getElementById('caption-container');
+    const captionText = document.getElementById('caption-text');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const postId = parseInt(urlParams.get('post')) || 1;
+
+    // Busca binária para achar o tamanho de fonte ideal sem cortes
+    function autoFitTextExact() {
+      const containerW = captionContainer.clientWidth;
+      const containerH = captionContainer.clientHeight;
+      
+      if (!containerW || !containerH) return;
+
+      let low = 10;
+      let high = 65;
+      let optimal = low;
+
+      for (let i = 0; i < 10; i++) {
+        const mid = (low + high) / 2;
+        captionText.style.fontSize = mid + 'px';
+        captionText.style.lineHeight = (mid * 1.35) + 'px';
+
+        const overflowH = captionText.scrollHeight > containerH;
+        const overflowW = captionText.scrollWidth > containerW;
+
+        if (!overflowH && !overflowW) {
+          optimal = mid;
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+
+      captionText.style.fontSize = optimal + 'px';
+      captionText.style.lineHeight = (optimal * 1.35) + 'px';
+    }
+
+    async function loadPostData() {
+      try {
+        const res = await fetch('data.json?t=' + new Date().getTime());
+        const posts = await res.json();
+        
+        const currentPost = posts.find(p => p.id === postId) || posts[0];
+        
+        captionText.innerText = currentPost.caption;
+
+        requestAnimationFrame(() => {
+          autoFitTextExact();
+        });
+
+        videoSource.src = currentPost.video_file;
+        player.load();
+        player.play().catch(e => console.log('Autoplay:', e));
+      } catch (e) {
+        console.log('Erro ao carregar dados:', e);
+      }
+    }
+
+    window.addEventListener('resize', autoFitTextExact);
+
+    player.addEventListener('timeupdate', () => {
+      if (player.duration) {
+        const pct = (player.currentTime / player.duration) * 100;
+        progressBar.style.width = pct + '%';
+      }
+    });
+
+    player.addEventListener('ended', () => {
+      player.currentTime = 0;
+      player.play();
+    });
+
+    loadPostData();
+  </script>
+</body>
+</html>
