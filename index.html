@@ -11,7 +11,6 @@
       margin: 0;
       padding: 0;
     }
-    /* Fundo Preto Total / Dark Carbon */
     body {
       background: radial-gradient(circle at top right, #1a1a1a, #0a0a0a, #000000);
       color: #ffffff;
@@ -90,25 +89,29 @@
     .header-text {
       flex: 1;
     }
+    
+    /* Badge Personalizada */
     .badge {
       display: inline-block;
       background: linear-gradient(135deg, #ea580c, #f97316);
       color: #ffffff;
-      font-size: clamp(0.75rem, 1vw, 1.05rem);
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
+      font-size: clamp(0.75rem, 0.95vw, 1rem);
+      font-weight: 800;
+      letter-spacing: 0.5px;
       padding: 6px 18px;
       border-radius: 50px;
       margin-bottom: 1vh;
       box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
     }
+    
+    /* Título 'L2 CENTRO DE TREINAMENTO' */
     .header h1 {
-      font-size: clamp(1.4rem, 2.2vw, 2.6rem);
+      font-size: clamp(1.2rem, 1.8vw, 2.2rem);
       font-weight: 900;
       line-height: 1.2;
       color: #ffffff;
       letter-spacing: -0.5px;
+      text-transform: uppercase;
     }
     .header h1 span {
       color: #f97316;
@@ -122,7 +125,7 @@
       filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.8));
     }
 
-    /* Área de Texto com Auto-Ajuste e Fonte Branca */
+    /* Área de Texto Auto-Ajustável com Fonte Branca */
     .caption-container {
       flex: 1;
       margin-top: 2vh;
@@ -135,7 +138,7 @@
     }
     .caption-box {
       width: 100%;
-      color: #ffffff; /* Texto 100% Branco com altíssima leitura */
+      color: #ffffff;
       white-space: pre-line;
       word-break: break-word;
       line-height: 1.45;
@@ -161,8 +164,8 @@
     <div class="info-section">
       <div class="header">
         <div class="header-text">
-          <span class="badge">Centro de Treinamento</span>
-          <h1>L2 <span>Treinamento</span></h1>
+          <span class="badge">Nossa família cuidando da sua família</span>
+          <h1>L2 <span>Centro de Treinamento</span></h1>
         </div>
         <img src="logo.png" alt="Logo L2" class="logo-img" onerror="this.style.display='none'">
       </div>
