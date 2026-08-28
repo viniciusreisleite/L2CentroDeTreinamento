@@ -58,21 +58,17 @@ def main():
         page = context.new_page()
         print(f"Acessando perfil de @{username} (Aba Reels)...")
 
-        # Acessa diretamente a aba /reels/ que lista em ordem cronológica
         try:
             page.goto(f"https://www.instagram.com/{username}/reels/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(6)
 
-            # Rola a página para baixo para carregar os posts
             for _ in range(5):
                 page.mouse.wheel(0, 1000)
                 time.sleep(2)
 
-            # Localiza os elementos de posts/reels
             elements = page.query_selector_all("a[href*='/reel/'], a[href*='/p/']")
             
             for el in elements:
-                # Verifica se o post possui indicador de fixado (Pin icon / Pinned)
                 is_pinned = False
                 try:
                     pin_elem = el.query_selector("svg[aria-label*='Pin'], svg[aria-label*='Fixado'], svg[title*='Pin'], svg[title*='Fixado']")
@@ -82,7 +78,7 @@ def main():
                     pass
 
                 if is_pinned:
-                    print("📌 Post fixado ignorado com sucesso.")
+                    print("📌 Post fixado ignorado.")
                     continue
 
                 href = el.get_attribute("href")
@@ -106,13 +102,13 @@ def main():
         print("❌ Nenhum post foi identificado.")
         return
 
-    # Baixa os 8 vídeos cronológicos e metadados
     posts_data = []
     allowed_videos = [f"video_{i}.mp4" for i in range(1, len(reels_urls[:target_count]) + 1)]
 
     for idx, reel_url in enumerate(reels_urls[:target_count], start=1):
         print(f"\n--- Processando Post #{idx}: {reel_url} ---")
         output_filename = f"video_{idx}.mp4"
+        temp_raw = f"temp_raw_{idx}.mp4"
 
         caption = ""
         try:
@@ -130,17 +126,35 @@ def main():
         except Exception as e:
             print(f"Erro ao capturar legenda: {e}")
 
-        cmd = [
+        cmd_download = [
             "yt-dlp",
             "--cookies", cookie_file,
             "--no-check-certificates",
-            "--merge-output-format", "mp4",
             "-f", "bestvideo+bestaudio/best",
-            "-o", output_filename,
+            "-o", temp_raw,
             "--force-overwrites",
             reel_url
         ]
-        subprocess.run(cmd, capture_output=True, text=True)
+        subprocess.run(cmd_download, capture_output=True, text=True)
+
+        if os.path.exists(temp_raw):
+            cmd_ffmpeg = [
+                "ffmpeg", "-y",
+                "-i", temp_raw,
+                "-vf", "scale='min(720,iw)':-2",
+                "-c:v", "libx264",
+                "-crf", "26",
+                "-preset", "veryfast",
+                "-c:a", "aac",
+                "-b:a", "96k",
+                "-movflags", "+faststart",
+                output_filename
+            ]
+            subprocess.run(cmd_ffmpeg, capture_output=True, text=True)
+            try:
+                os.remove(temp_raw)
+            except Exception:
+                pass
 
         posts_data.append({
             "id": idx,
@@ -158,7 +172,7 @@ def main():
     if os.path.exists(cookie_file):
         os.remove(cookie_file)
 
-    print("\n✅ Concluído! Mantidos estritamente os 8 posts mais recentes (sem fixados).")
+    print("\n✅ Concluído! Vídeos comprimidos em 720p e salvos.")
 
 if __name__ == "__main__":
     main()
