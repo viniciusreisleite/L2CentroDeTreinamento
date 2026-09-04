@@ -8,7 +8,7 @@ import urllib.request
 import yt_dlp
 from playwright.sync_api import sync_playwright
 
-USERNAME = "l2centrode_treinamento"
+USERNAME = "l2_centrodetreinamento"
 TARGET_COUNT = 12
 
 def progresso_hook(d):
