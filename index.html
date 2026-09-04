@@ -4,291 +4,195 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mural Digital - L2 Centro de Treinamento</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    body {
-      background: radial-gradient(circle at top right, #1a1a1a, #0a0a0a, #000000);
-      color: #ffffff;
-      font-family: 'Montserrat', sans-serif;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-    }
-    .tv-container {
-      display: flex;
+
+    body, html {
       width: 100%;
       height: 100%;
-      padding: 3vh 2.5vw;
-      gap: 2.5vw;
+      background-color: #0d0d0d;
+      font-family: 'Montserrat', sans-serif;
+      overflow: hidden;
+      color: #fff;
     }
 
-    /* Coluna de Vídeo */
-    .video-section {
+    .container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      padding: 3vh 3vw;
+      gap: 3vw;
+    }
+
+    /* Coluna da Midia (35% da tela) */
+    .media-column {
       flex: 0 0 35%;
       height: 100%;
-      background: #000;
-      border-radius: 26px;
+      position: relative;
+      border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 20px 45px rgba(0,0,0,0.9);
+      background-color: #050505;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      border: 2px solid rgba(249, 115, 22, 0.4);
     }
+
     video, #image-player {
       width: 100%;
       height: 100%;
-      object-fit: cover;
-    }
-    .progress-bar-container {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 8px;
-      background: rgba(255, 255, 255, 0.15);
-    }
-    .progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #ea580c, #f97316, #fb923c);
-      transition: width 0.1s linear;
+      object-fit: contain;
+      background-color: #050505;
     }
 
-    /* Coluna Informativa Dark & Orange */
-    .info-section {
+    /* Coluna de Informações (65% da tela) */
+    .info-column {
       flex: 1;
       height: 100%;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(18px);
-      border: 1px solid rgba(249, 115, 22, 0.25);
-      border-radius: 26px;
-      padding: 3.5vh 3vw;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
+      background: linear-gradient(145deg, #141414, #1a1a1a);
+      border-radius: 20px;
+      padding: 4vh 3vw;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      border: 1px solid #262626;
+      position: relative;
     }
 
-    /* Cabeçalho */
-    .header {
+    .header-box {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 25px;
-      padding-bottom: 2vh;
-      border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+      justify-content: space-between;
+      border-bottom: 2px solid #ff5722;
+      padding-bottom: 2.5vh;
+      margin-bottom: 3vh;
     }
-    .header-text {
-      flex: 1;
-    }
-    .badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #ea580c, #f97316);
-      color: #ffffff;
-      font-size: clamp(0.75rem, 0.95vw, 1rem);
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      padding: 6px 18px;
-      border-radius: 50px;
-      margin-bottom: 1vh;
-      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
-    }
-    .header h1 {
-      font-size: clamp(1.2rem, 1.8vw, 2.2rem);
+
+    .brand-title {
+      font-size: 2.2vw;
       font-weight: 900;
-      line-height: 1.2;
-      color: #ffffff;
-      letter-spacing: -0.5px;
+      color: #ff5722;
+      letter-spacing: 1px;
       text-transform: uppercase;
     }
-    .header h1 span {
-      color: #f97316;
+
+    .badge {
+      background: #ff5722;
+      color: #fff;
+      font-size: 0.9vw;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: inline-block;
+      margin-bottom: 8px;
     }
 
-    .logo-img {
-      height: clamp(85px, 14vh, 140px);
-      max-width: 260px;
-      object-fit: contain;
-      filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.8));
-    }
-
-    /* Área de Texto Auto-Ajustável */
     .caption-container {
       flex: 1;
-      margin-top: 2vh;
       overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      width: 100%;
-      height: 100%;
+      position: relative;
     }
-    .caption-box {
-      width: 100%;
-      color: #ffffff;
-      white-space: pre-line;
-      word-break: break-word;
-      line-height: 1.45;
+
+    .caption-text {
+      font-size: 1.35vw;
+      line-height: 1.6;
+      color: #e0e0e0;
       font-weight: 500;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .brand-logo {
+      height: 7vh;
+      max-width: 15vw;
+      object-fit: contain;
     }
   </style>
 </head>
 <body>
 
-  <div class="tv-container">
-    <div class="video-section">
-      <img <img id="image-player" style="display:none; width:100%; height:100%; object-fit:contain; background-color:#050505;" />
-        <video id="player" autoplay playsinline muted preload="auto">
-        <source id="video-source" src="video_1.mp4" type="video/mp4">
+  <div class="container">
+    <div class="media-column">
+      <img id="image-player" style="display:none;" />
+      <video id="player" autoplay playsinline muted loop preload="auto">
+        <source id="video-source" src="" type="video/mp4">
       </video>
-      <div class="progress-bar-container">
-        <div class="progress-bar" id="progress"></div>
-      </div>
     </div>
 
-    <div class="info-section">
-      <div class="header">
-        <div class="header-text">
+    <div class="info-column">
+      <div class="header-box">
+        <div>
           <span class="badge">Nossa família cuidando da sua família</span>
-          <h1>L2 <span>Centro de Treinamento</span></h1>
+          <h1 class="brand-title">L2 CENTRO DE TREINAMENTO</h1>
         </div>
-        <img src="logo.png" alt="Logo L2" class="logo-img" onerror="this.style.display='none'">
+        <img class="brand-logo" src="logo.png" alt="Logo L2">
       </div>
 
       <div class="caption-container" id="caption-container">
-        <div class="caption-box" id="caption-text">
-          Carregando informações...
-        </div>
+        <div class="caption-text" id="caption-text">Carregando informações...</div>
       </div>
     </div>
   </div>
 
   <script>
-    const player = document.getElementById('player');
-    const videoSource = document.getElementById('video-source');
-    const progressBar = document.getElementById('progress');
-    const captionContainer = document.getElementById('caption-container');
-    const captionText = document.getElementById('caption-text');
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const postId = parseInt(urlParams.get('post')) || 1;
-
-    let consecutiveErrors = 0;
-    const maxConsecutiveErrors = 5;
-
-    function autoFitTextExact() {
-      const containerW = captionContainer.clientWidth;
-      const containerH = captionContainer.clientHeight;
-      
-      if (!containerW || !containerH) return;
-
-      let low = 10;
-      let high = 65;
-      let optimal = low;
-
-      for (let i = 0; i < 10; i++) {
-        const mid = (low + high) / 2;
-        captionText.style.fontSize = mid + 'px';
-        captionText.style.lineHeight = (mid * 1.35) + 'px';
-
-        const overflowH = captionText.scrollHeight > containerH;
-        const overflowW = captionText.scrollWidth > containerW;
-
-        if (!overflowH && !overflowW) {
-          optimal = mid;
-          low = mid;
-        } else {
-          high = mid;
-        }
-      }
-
-      captionText.style.fontSize = optimal + 'px';
-      captionText.style.lineHeight = (optimal * 1.35) + 'px';
-    }
-
-    player.addEventListener('error', () => {
-      consecutiveErrors++;
-      if (consecutiveErrors >= maxConsecutiveErrors) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } else {
-        setTimeout(() => {
-          player.load();
-          player.play().catch(() => {});
-        }, 3000);
-      }
-    });
-
-    player.addEventListener('playing', () => {
-      consecutiveErrors = 0;
-    });
-
-    async function loadPostData() {
+    async function init() {
       const timestamp = new Date().getTime();
       try {
-        const res = await fetch(`data.json?t=${timestamp}`);
-        const posts = await res.json();
-        
+        const response = await fetch(`data.json?t=${timestamp}`);
+        const posts = await response.json();
+
+        if (!posts || posts.length === 0) return;
+
+        // Leitura de ?post=X
+        const urlParams = new URLSearchParams(window.location.search);
         const postParam = urlParams.get('post');
-const postIndex = parseInt(postParam, 10);
-const currentPost = (!isNaN(postIndex))
-  ? (posts.find(p => p.id === postIndex || p.id === String(postIndex)) || posts[postIndex - 1] || posts[0])
-  : posts[0];
+        const postIndex = parseInt(postParam, 10);
         
-        captionText.innerText = currentPost.caption;
+        let currentPost = posts[0];
+        if (!isNaN(postIndex)) {
+          currentPost = posts.find(p => p.id === postIndex || p.id === String(postIndex)) || posts[postIndex - 1] || posts[0];
+        }
 
-        requestAnimationFrame(() => {
-          autoFitTextExact();
-        });
+        // Renderiza a Legenda
+        const captionElem = document.getElementById('caption-text');
+        captionElem.innerText = currentPost.caption || 'Sem legenda para esta publicação.';
 
+        // Renderiza Midia (Foto ou Video)
+        const player = document.getElementById('player');
+        const videoSource = document.getElementById('video-source');
         const imagePlayer = document.getElementById('image-player');
-const midiaArquivo = currentPost.media || currentPost.video_file;
-const isFoto = currentPost.type === 'image' || (midiaArquivo && (midiaArquivo.endsWith('.jpg') || midiaArquivo.endsWith('.png')));
+        
+        const midiaArquivo = currentPost.media || currentPost.media_file || currentPost.video_file;
+        const isFoto = currentPost.type === 'image' || (midiaArquivo && (midiaArquivo.endsWith('.jpg') || midiaArquivo.endsWith('.png')));
 
-if (isFoto) {
-    player.pause();
-    player.style.display = 'none';
-    imagePlayer.style.display = 'block';
-    imagePlayer.src = `${midiaArquivo}?t=${timestamp}`;
-} else {
-    if (imagePlayer) imagePlayer.style.display = 'none';
-    player.style.display = 'block';
-    videoSource.src = `${midiaArquivo}?t=${timestamp}`;
-    player.load();
-    player.play().catch(e => console.log('Autoplay:', e));
-}
-        player.load();
-        player.play().catch(e => console.log('Autoplay:', e));
-      } catch (e) {
-        console.log('Erro ao carregar dados:', e);
+        if (isFoto) {
+          player.pause();
+          player.style.display = 'none';
+          imagePlayer.style.display = 'block';
+          imagePlayer.src = `${midiaArquivo}?t=${timestamp}`;
+        } else {
+          imagePlayer.style.display = 'none';
+          player.style.display = 'block';
+          videoSource.src = `${midiaArquivo}?t=${timestamp}`;
+          player.load();
+          player.play().catch(e => console.log('Autoplay:', e));
+        }
+
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
       }
     }
 
-    window.addEventListener('resize', autoFitTextExact);
-
-    player.addEventListener('timeupdate', () => {
-      if (player.duration) {
-        const pct = (player.currentTime / player.duration) * 100;
-        progressBar.style.width = pct + '%';
-      }
-    });
-
-    player.addEventListener('ended', () => {
-      player.currentTime = 0;
-      player.play().catch(e => console.log('Erro ao reiniciar:', e));
-    });
-
-    loadPostData();
+    window.onload = init;
   </script>
 </body>
 </html>
