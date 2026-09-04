@@ -1,14 +1,21 @@
 @echo off
 cd /d "%~dp0"
 echo ======================================================
-echo Atualizando mural: L2CentroDeTreinamento (@l2_centrodetreinamento)
+echo Atualizando mural: L2CentroDeTreinamento
 echo ======================================================
+
+echo 1. Baixando fotos e videos do Instagram...
 python baixar_mural.py
 
-echo Enviando atualizacoes para o GitHub Pages...
-git add data.json media_*.mp4
-git diff-index --quiet HEAD || git commit -m "Atualizacao automatica mural"
+echo.
+echo 2. Enviando para o repositorio GitHub...
+git add -A
+
+git diff-index --quiet HEAD || git commit -m "Atualizacao mural"
 git push origin main
 
-echo Concluido! Em ~40s o painel estara atualizado.
-timeout /t 5
+echo.
+echo 3. Aguardando 35 segundos para conclusao do deploy no Pages...
+timeout /t 35 /nobreak
+
+echo Concluido!
