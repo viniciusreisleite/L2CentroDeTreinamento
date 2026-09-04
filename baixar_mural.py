@@ -8,7 +8,7 @@ import urllib.request
 import yt_dlp
 from playwright.sync_api import sync_playwright
 
-USERNAME = "l2_centrodetreinamento"
+USERNAME = "l2centrode_treinamento"
 TARGET_COUNT = 12
 
 def progresso_hook(d):
@@ -180,7 +180,7 @@ def main():
                         if "Foto de" in alt_txt or "Photo by" in alt_txt:
                             caption = alt_txt
 
-                video_elem = page.query_selector("article video, div[role='dialog'] video")
+                video_elem = page.query_selector("video")
                 if video_elem:
                     is_video = True
                 elif not is_video:
@@ -228,16 +228,16 @@ def main():
                     ]
                 }
 
-                sucesso_video = False
+                video_sucesso = False
                 try:
                     with yt_dlp.YoutubeDL(opts_video) as ydl:
                         ydl.download([post_url])
                     if os.path.exists(output_filename) and os.path.getsize(output_filename) > 1000:
-                        sucesso_video = True
+                        video_sucesso = True
                 except Exception as e:
-                    print(f"Aviso no download de video: {e}")
+                    print(f"Aviso: nao e video unico ({e}). Alternando para foto...")
 
-                if sucesso_video:
+                if video_sucesso:
                     posts_data.append({
                         "id": idx,
                         "type": "video",
@@ -250,79 +250,39 @@ def main():
                     })
                     print(f"Salvo (video): {output_filename} | Legenda: {caption[:30]}...")
                 else:
-                    # Fallback: Se nao era video ou falhou, salva como foto
-                    if os.path.exists(output_filename):
-                        try: os.remove(output_filename)
-                        except Exception: pass
-                    allowed_files.remove(output_filename)
-                    output_filename = f"media_{idx}.jpg"
-                    allowed_files.append(output_filename)
-                    
-                    baixou_foto = False
+                    # Fallback imediato para imagem/carrossel
+                    output_img = f"media_{idx}.jpg"
+                    if output_filename in allowed_files:
+                        allowed_files.remove(output_filename)
+                    allowed_files.append(output_img)
+                    downloaded = False
                     if image_download_url:
                         try:
                             req = urllib.request.Request(image_download_url, headers={'User-Agent': 'Mozilla/5.0'})
-                            with urllib.request.urlopen(req, timeout=20) as resp, open(output_filename, 'wb') as out_f:
-                                out_f.write(resp.read())
-                            baixou_foto = True
-                        except Exception: pass
-                    
-                    if not baixou_foto:
+                            with urllib.request.urlopen(req, timeout=20) as response, open(output_img, 'wb') as out_f:
+                                out_f.write(response.read())
+                            downloaded = True
+                        except Exception:
+                            pass
+                    if not downloaded:
                         try:
-                            img_node = page.query_selector("article img, div[role='dialog'] img")
-                            if img_node:
-                                img_node.screenshot(path=output_filename)
-                                baixou_foto = True
-                        except Exception: pass
-
+                            img_n = page.query_selector("article img, img[style*='object-fit']")
+                            if img_n:
+                                img_n.screenshot(path=output_img)
+                                downloaded = True
+                        except Exception:
+                            pass
                     posts_data.append({
                         "id": idx,
                         "type": "image",
                         "url": post_url,
-                        "media": output_filename,
-                        "media_file": output_filename,
-                        "video_file": output_filename,
+                        "media": output_img,
+                        "media_file": output_img,
+                        "image_file": output_img,
                         "caption": caption,
                         "updated_at": time.strftime("%d/%m/%Y as %H:%M")
                     })
-                    print(f"Salvo (foto fallback): {output_filename} | Legenda: {caption[:30]}...")
-                else:
-                    # Fallback: Se nao era video ou falhou, salva como foto
-                    if os.path.exists(output_filename):
-                        try: os.remove(output_filename)
-                        except Exception: pass
-                    allowed_files.remove(output_filename)
-                    output_filename = f"media_{idx}.jpg"
-                    allowed_files.append(output_filename)
-                    
-                    baixou_foto = False
-                    if image_download_url:
-                        try:
-                            req = urllib.request.Request(image_download_url, headers={'User-Agent': 'Mozilla/5.0'})
-                            with urllib.request.urlopen(req, timeout=20) as resp, open(output_filename, 'wb') as out_f:
-                                out_f.write(resp.read())
-                            baixou_foto = True
-                        except Exception: pass
-                    
-                    if not baixou_foto:
-                        try:
-                            img_node = page.query_selector("article img, div[role='dialog'] img")
-                            if img_node:
-                                img_node.screenshot(path=output_filename)
-                                baixou_foto = True
-                        except Exception: pass
-
-                    posts_data.append({
-                        "id": idx,
-                        "type": "image",
-                        "url": post_url,
-                        "media": output_filename,
-                        "media_file": output_filename,
-                        "video_file": output_filename,
-                        "caption": caption,
-                        "updated_at": time.strftime("%d/%m/%Y as %H:%M")
-                    })
-                    print(f"Salvo (foto fallback): {output_filename} | Legenda: {caption[:30]}...")
+                    print(f"Salvo (imagem fallback): {output_img} | Legenda: {caption[:30]}...")
 
             else:
                 output_filename = f"media_{idx}.jpg"
