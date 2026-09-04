@@ -6,7 +6,7 @@
   <title>Mural Digital - L2 Centro de Treinamento</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * {
       box-sizing: border-box;
@@ -58,7 +58,7 @@
       flex-direction: column;
       background: linear-gradient(145deg, #141414, #1a1a1a);
       border-radius: 20px;
-      padding: 4vh 3vw;
+      padding: 3.5vh 2.5vw;
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       border: 1px solid #262626;
       position: relative;
@@ -69,12 +69,13 @@
       align-items: center;
       justify-content: space-between;
       border-bottom: 2px solid #ff5722;
-      padding-bottom: 2.5vh;
-      margin-bottom: 3vh;
+      padding-bottom: 2vh;
+      margin-bottom: 2vh;
+      flex-shrink: 0;
     }
 
     .brand-title {
-      font-size: 2.2vw;
+      font-size: 2vw;
       font-weight: 900;
       color: #ff5722;
       letter-spacing: 1px;
@@ -84,35 +85,39 @@
     .badge {
       background: #ff5722;
       color: #fff;
-      font-size: 0.9vw;
+      font-size: 0.8vw;
       font-weight: 800;
-      padding: 6px 14px;
+      padding: 5px 12px;
       border-radius: 20px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       display: inline-block;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+    }
+
+    .brand-logo {
+      height: 6.5vh;
+      max-width: 13vw;
+      object-fit: contain;
     }
 
     .caption-container {
       flex: 1;
-      overflow-y: hidden;
-      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
     }
 
     .caption-text {
-      font-size: 1.35vw;
-      line-height: 1.6;
-      color: #e0e0e0;
+      width: 100%;
+      color: #e5e5e5;
       font-weight: 500;
+      line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
-    }
-
-    .brand-logo {
-      height: 7vh;
-      max-width: 15vw;
-      object-fit: contain;
     }
   </style>
 </head>
@@ -135,15 +140,36 @@
         <img class="brand-logo" src="logo.png" alt="Logo L2">
       </div>
 
-      <div class="caption-container">
-        <div class="caption-text" id="caption-text">Carregando informações...</div>
+      <div class="caption-container" id="caption-container">
+        <div class="caption-text" id="caption-text">Carregando...</div>
       </div>
     </div>
   </div>
 
   <script>
+    function ajustarFonteTexto(container, elemento) {
+      // Inicia com um tamanho proporcional grande e reduz gradualmente
+      let fontSize = window.innerHeight * 0.024; // ~1.8vh inicial
+      const minFontSize = window.innerHeight * 0.013; // ~1.0vh minimo legivel em TV
+
+      elemento.style.fontSize = `${fontSize}px`;
+      elemento.style.lineHeight = '1.45';
+
+      // Reduz em passos ate que caiba sem overflow vertical
+      while (elemento.scrollHeight > container.clientHeight && fontSize > minFontSize) {
+        fontSize -= 0.5;
+        elemento.style.fontSize = `${fontSize}px`;
+      }
+
+      // Se mesmo no tamanho minimo ainda ultrapassar, aperta levemente a entrelinha
+      if (elemento.scrollHeight > container.clientHeight) {
+        elemento.style.lineHeight = '1.3';
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       const timestamp = Date.now();
+      const containerElem = document.getElementById('caption-container');
       const captionElem = document.getElementById('caption-text');
       const player = document.getElementById('player');
       const videoSource = document.getElementById('video-source');
@@ -151,16 +177,8 @@
 
       try {
         const response = await fetch(`data.json?t=${timestamp}`);
-        if (!response.ok) {
-          captionElem.textContent = 'Erro ao carregar o arquivo data.json (' + response.status + ')';
-          return;
-        }
-        
         const posts = await response.json();
-        if (!Array.isArray(posts) || posts.length === 0) {
-          captionElem.textContent = 'Nenhum post disponível.';
-          return;
-        }
+        if (!Array.isArray(posts) || posts.length === 0) return;
 
         const urlParams = new URLSearchParams(window.location.search);
         const postParam = urlParams.get('post');
@@ -171,11 +189,16 @@
           currentPost = posts.find(p => p.id === postIdx || String(p.id) === String(postIdx)) || posts[postIdx - 1] || posts[0];
         }
 
-        // Injeta o texto com suporte a quebras de linha
-        const textoDescricao = currentPost.caption || currentPost.text || 'L2 Centro de Treinamento - Treinos personalizados e qualidade de vida!';
-        captionElem.textContent = textoDescricao;
+        // Limpa excesso de quebras de linha vazias consecutivas (mais de 2 seguidas)
+        let texto = currentPost.caption || currentPost.text || '';
+        texto = texto.replace(/\n{3,}/g, '\n\n').trim();
+        captionElem.textContent = texto;
 
-        // Gerenciamento da mídia
+        // Autoajuste do tamanho da fonte
+        ajustarFonteTexto(containerElem, captionElem);
+        window.addEventListener('resize', () => ajustarFonteTexto(containerElem, captionElem));
+
+        // Midia
         const midiaArquivo = currentPost.media || currentPost.media_file || currentPost.video_file;
         const isFoto = currentPost.type === 'image' || (midiaArquivo && (midiaArquivo.endsWith('.jpg') || midiaArquivo.endsWith('.png')));
 
@@ -199,7 +222,6 @@
         }
       } catch (err) {
         console.error(err);
-        captionElem.textContent = 'Erro de script: ' + err.message;
       }
     });
   </script>
