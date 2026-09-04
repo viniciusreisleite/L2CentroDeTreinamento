@@ -31,7 +31,6 @@
       gap: 3vw;
     }
 
-    /* Coluna da Midia (35% da tela) */
     .media-column {
       flex: 0 0 35%;
       height: 100%;
@@ -52,7 +51,6 @@
       background-color: #050505;
     }
 
-    /* Coluna de Informações (65% da tela) */
     .info-column {
       flex: 1;
       height: 100%;
@@ -98,7 +96,7 @@
 
     .caption-container {
       flex: 1;
-      overflow: hidden;
+      overflow-y: hidden;
       position: relative;
     }
 
@@ -137,62 +135,73 @@
         <img class="brand-logo" src="logo.png" alt="Logo L2">
       </div>
 
-      <div class="caption-container" id="caption-container">
+      <div class="caption-container">
         <div class="caption-text" id="caption-text">Carregando informações...</div>
       </div>
     </div>
   </div>
 
   <script>
-    async function init() {
-      const timestamp = new Date().getTime();
+    document.addEventListener('DOMContentLoaded', async () => {
+      const timestamp = Date.now();
+      const captionElem = document.getElementById('caption-text');
+      const player = document.getElementById('player');
+      const videoSource = document.getElementById('video-source');
+      const imagePlayer = document.getElementById('image-player');
+
       try {
         const response = await fetch(`data.json?t=${timestamp}`);
-        const posts = await response.json();
-
-        if (!posts || posts.length === 0) return;
-
-        // Leitura de ?post=X
-        const urlParams = new URLSearchParams(window.location.search);
-        const postParam = urlParams.get('post');
-        const postIndex = parseInt(postParam, 10);
+        if (!response.ok) {
+          captionElem.textContent = 'Erro ao carregar o arquivo data.json (' + response.status + ')';
+          return;
+        }
         
-        let currentPost = posts[0];
-        if (!isNaN(postIndex)) {
-          currentPost = posts.find(p => p.id === postIndex || p.id === String(postIndex)) || posts[postIndex - 1] || posts[0];
+        const posts = await response.json();
+        if (!Array.isArray(posts) || posts.length === 0) {
+          captionElem.textContent = 'Nenhum post disponível.';
+          return;
         }
 
-        // Renderiza a Legenda
-        const captionElem = document.getElementById('caption-text');
-        captionElem.innerText = currentPost.caption || 'Sem legenda para esta publicação.';
+        const urlParams = new URLSearchParams(window.location.search);
+        const postParam = urlParams.get('post');
+        const postIdx = parseInt(postParam, 10);
 
-        // Renderiza Midia (Foto ou Video)
-        const player = document.getElementById('player');
-        const videoSource = document.getElementById('video-source');
-        const imagePlayer = document.getElementById('image-player');
-        
+        let currentPost = posts[0];
+        if (!isNaN(postIdx)) {
+          currentPost = posts.find(p => p.id === postIdx || String(p.id) === String(postIdx)) || posts[postIdx - 1] || posts[0];
+        }
+
+        // Injeta o texto com suporte a quebras de linha
+        const textoDescricao = currentPost.caption || currentPost.text || 'L2 Centro de Treinamento - Treinos personalizados e qualidade de vida!';
+        captionElem.textContent = textoDescricao;
+
+        // Gerenciamento da mídia
         const midiaArquivo = currentPost.media || currentPost.media_file || currentPost.video_file;
         const isFoto = currentPost.type === 'image' || (midiaArquivo && (midiaArquivo.endsWith('.jpg') || midiaArquivo.endsWith('.png')));
 
         if (isFoto) {
-          player.pause();
-          player.style.display = 'none';
-          imagePlayer.style.display = 'block';
-          imagePlayer.src = `${midiaArquivo}?t=${timestamp}`;
+          if (player) {
+            player.pause();
+            player.style.display = 'none';
+          }
+          if (imagePlayer) {
+            imagePlayer.style.display = 'block';
+            imagePlayer.src = `${midiaArquivo}?t=${timestamp}`;
+          }
         } else {
-          imagePlayer.style.display = 'none';
-          player.style.display = 'block';
-          videoSource.src = `${midiaArquivo}?t=${timestamp}`;
-          player.load();
-          player.play().catch(e => console.log('Autoplay:', e));
+          if (imagePlayer) imagePlayer.style.display = 'none';
+          if (player && videoSource) {
+            player.style.display = 'block';
+            videoSource.src = `${midiaArquivo}?t=${timestamp}`;
+            player.load();
+            player.play().catch(e => console.log('Autoplay:', e));
+          }
         }
-
       } catch (err) {
-        console.error('Erro ao carregar dados:', err);
+        console.error(err);
+        captionElem.textContent = 'Erro de script: ' + err.message;
       }
-    }
-
-    window.onload = init;
+    });
   </script>
 </body>
 </html>
