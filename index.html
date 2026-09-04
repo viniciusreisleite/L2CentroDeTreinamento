@@ -247,7 +247,22 @@
           autoFitTextExact();
         });
 
-        videoSource.src = `${currentPost.video_file}?t=${timestamp}`;
+        const imagePlayer = document.getElementById('image-player');
+const midiaArquivo = currentPost.media || currentPost.video_file;
+const isFoto = currentPost.type === 'image' || (midiaArquivo && (midiaArquivo.endsWith('.jpg') || midiaArquivo.endsWith('.png')));
+
+if (isFoto) {
+    player.pause();
+    player.style.display = 'none';
+    imagePlayer.style.display = 'block';
+    imagePlayer.src = `${midiaArquivo}?t=${timestamp}`;
+} else {
+    if (imagePlayer) imagePlayer.style.display = 'none';
+    player.style.display = 'block';
+    videoSource.src = `${midiaArquivo}?t=${timestamp}`;
+    player.load();
+    player.play().catch(e => console.log('Autoplay:', e));
+}
         player.load();
         player.play().catch(e => console.log('Autoplay:', e));
       } catch (e) {
