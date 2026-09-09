@@ -145,6 +145,7 @@ def main():
         for idx, post_url in enumerate(posts_urls, start=1):
             print(f"\n[{idx}/{len(posts_urls)}] Processando: {post_url}")
             is_video = "/reel/" in post_url
+            slide_index = 1
             caption = ""
             image_download_url = ""
 
@@ -211,6 +212,7 @@ def main():
                 opts_video = {
                     'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
                     'outtmpl': output_filename,
+                    'playlist_items': str(slide_index),
                     'overwrites': True,
                     'cookiefile': cookie_file,
                     'progress_hooks': [progresso_hook],
