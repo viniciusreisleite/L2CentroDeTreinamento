@@ -1,268 +1,213 @@
-﻿import os, sys, json, time, re, shutil
+﻿import os
+import sys
+import time
+import json
+import requests
+from playwright.sync_api import sync_playwright
+
+PERFIL = "l2_centrodetreinamento"
+BADGE_TEXTO = "L2 Centro de Treinamento"
+COR_TEMA = "#f97316"
+TOTAL_MIDIAS = 12
+COOKIES_FILE = "cookies.txt"
+
+def carregar_cookies():
+    cookies_dict = {}
+    if os.path.exists(COOKIES_FILE):
+        with open(COOKIES_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"): continue
+                p = line.split("\t")
+                if len(p) >= 7:
+                    cookies_dict[p[5]] = p[6]
+    return cookies_dict
 
 def shortcode_to_media_id(shortcode):
-    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
     media_id = 0
     for letter in shortcode:
         media_id = (media_id * 64) + alphabet.index(letter)
     return str(media_id)
 
-def baixar_imagem_api_hd(shortcode, out_path, cookies_file):
-    cookies_dict = {}
-    if os.path.exists(cookies_file):
-        with open(cookies_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'): continue
-                parts = line.split('\t')
-                if len(parts) >= 7:
-                    cookies_dict[parts[5]] = parts[6]
+def baixar_midia_por_tipo(shortcode, out_prefix, cookies_dict):
+    """
+    Identifica na API do Instagram se o post é Vídeo, Imagem Única ou Carrossel
+    e faz o download exato na resolução máxima nativa sem cortes.
+    """
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'X-IG-App-ID': '936619743392459',
-        'Accept': '*/*'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "X-IG-App-ID": "936619743392459",
+        "Accept": "*/*"
     }
+    
+    mid = shortcode_to_media_id(shortcode)
+    api_url = f"https://www.instagram.com/api/v1/media/{mid}/info/"
+    
     try:
-        mid = shortcode_to_media_id(shortcode)
-        api_url = f'https://www.instagram.com/api/v1/media/{mid}/info/'
         r = requests.get(api_url, headers=headers, cookies=cookies_dict, timeout=15)
-        if r.status_code == 200:
-            data = r.json()
-            items = data.get('items', [])
-            if items:
-                item = items[0]
-                if 'carousel_media' in item and len(item['carousel_media']) > 0:
-                    cand = item['carousel_media'][0].get('image_versions2', {}).get('candidates', [])
-                else:
-                    cand = item.get('image_versions2', {}).get('candidates', [])
-                if cand:
-                    img_url = cand[0]['url']
-                    img_data = requests.get(img_url, timeout=20).content
-                    with open(out_path, 'wb') as f:
-                        f.write(img_data)
-                    return True
-    except Exception:
-        pass
-    return False
-from playwright.sync_api import sync_playwright
-import yt_dlp
+        if r.status_code != 200:
+            print(f"      [ERRO HTTP {r.status_code}] Falha ao consultar metadados do post.")
+            return None, None
+            
+        data = r.json()
+        items = data.get("items", [])
+        if not items:
+            return None, None
+            
+        item = items[0]
+        media_type = item.get("media_type") # 1: Foto, 2: Vídeo, 8: Carrossel
+        
+        # Caso seja Carrossel, pegamos o primeiro slide
+        if media_type == 8:
+            carousel = item.get("carousel_media", [])
+            if not carousel:
+                return None, None
+            item = carousel[0]
+            media_type = item.get("media_type")
+            print(f"      -> Detectado: CARROSSEL (extraindo slide 1)")
 
-ACCOUNTS = [
-    {"username": "l2_centrodetreinamento", "badge": "L2 Treinamento", "color": "#8b5cf6"}
-]
+        # 1. Post é VÍDEO
+        if media_type == 2:
+            videos = item.get("video_versions", [])
+            if videos:
+                video_url = videos[0]["url"]
+                arquivo = f"{out_prefix}.mp4"
+                print(f"      -> Detectado: VIDEO ({videos[0].get('width')}x{videos[0].get('height')})")
+                res = requests.get(video_url, timeout=30)
+                if res.status_code == 200:
+                    with open(arquivo, "wb") as f:
+                        f.write(res.content)
+                    return "video", arquivo
 
-TARGET_TOTAL = 12
-POSTS_PER_ACCOUNT = 12
-DATA_JSON = "data.json"
-COOKIES_FILE = "cookies.txt"
+        # 2. Post é IMAGEM
+        elif media_type == 1:
+            candidatos = item.get("image_versions2", {}).get("candidates", [])
+            if candidatos:
+                img_url = candidatos[0]["url"]
+                arquivo = f"{out_prefix}.jpg"
+                print(f"      -> Detectado: IMAGEM ({candidatos[0].get('width')}x{candidatos[0].get('height')} - Proporção Integral)")
+                res = requests.get(img_url, timeout=20)
+                if res.status_code == 200:
+                    with open(arquivo, "wb") as f:
+                        f.write(res.content)
+                    return "image", arquivo
 
-def carregar_cookies_playwright():
-    if not os.path.exists(COOKIES_FILE):
-        return []
-    cookies = []
-    with open(COOKIES_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split("\t")
-            if len(parts) >= 7:
-                domain, _, path, secure, expires, name, value = parts[:7]
-                cookies.append({
-                    "name": name,
-                    "value": value,
-                    "domain": domain,
-                    "path": path,
-                    "secure": secure.lower() == "true",
-                    "expires": float(expires) if expires.isdigit() else -1
-                })
-    return cookies
+    except Exception as e:
+        print(f"      [EXCECAO API] {e}")
 
-def extrair_shortcode(url):
-    m = re.search(r'/(?:p|reel|tv)/([^/?#&]+)', url)
-    return m.group(1) if m else url
+    return None, None
 
-def carregar_cache():
-    if os.path.exists(DATA_JSON):
-        try:
-            with open(DATA_JSON, "r", encoding="utf-8") as f:
-                dados = json.load(f)
-                cache = {}
-                for item in dados:
-                    url = item.get("url") or item.get("link", "")
-                    sc = extrair_shortcode(url)
-                    if sc:
-                        cache[sc] = item
-                return cache
-        except Exception:
-            return {}
-    return {}
-
-def baixar_imagem_hd(url, destino):
-    try:
-        r = requests.get(url, timeout=15)
-        if r.status_code == 200:
-            with open(destino, "wb") as f:
-                f.write(r.content)
-            return True
-    except Exception:
-        pass
-    return False
-
-def processar_mural():
-    cache_local = carregar_cache()
-    posts_a_manter = []
-    cookies_playwright = carregar_cookies_playwright()
-
-    print("=== INICIANDO SINCRONIZACAO (SESSAO AUTENTICADA) ===")
+def main():
+    print("=== SINCRONIZACAO ESTRUTURADA POR TIPO DE MIDIA ===")
+    cookies_dict = carregar_cookies()
+    
+    cookies_playwright = []
+    for k, v in cookies_dict.items():
+        cookies_playwright.append({
+            "name": k, "value": v, "domain": ".instagram.com", "path": "/"
+        })
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-        )
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            viewport={"width": 1920, "height": 1080}
-        )
-
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(viewport={"width": 1920, "height": 1080})
         if cookies_playwright:
-            context.add_cookies(cookies_playwright)
-
-        page = context.new_page()
-
-        for acc in ACCOUNTS:
-            usr = acc["username"]
-            badge = acc.get("badge", "")
-            cor = acc.get("color", "#ff1744")
-            print(f"\nChecando feed de @{usr}...")
-
-            page.goto(f"https://www.instagram.com/{usr}/", wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(2000)
-            urls_encontradas = []
-
-            for _ in range(8):
-                anchors = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
-                for a in anchors:
-                    href = a.get_attribute("href")
-                    if href:
-                        clean = href.split("?")[0].strip("/")
-                        full = f"https://www.instagram.com/{clean}/"
-                        if full not in urls_encontradas:
-                            urls_encontradas.append(full)
-                if len(urls_encontradas) >= POSTS_PER_ACCOUNT:
-                    break
-                page.evaluate("window.scrollBy(0, 1000)")
-                page.wait_for_timeout(600)
-
-            candidatos = urls_encontradas[:POSTS_PER_ACCOUNT]
-            print(f"Posts no feed: {len(candidatos)} identificados.")
-
-            for url in candidatos:
-                sc = extrair_shortcode(url)
-
-                if sc in cache_local:
-                    item_cache = cache_local[sc]
-                    arquivo_salvo = item_cache.get("arquivo")
-                    if arquivo_salvo and os.path.exists(arquivo_salvo):
-                        print(f"  [CACHE OK] {sc} ({arquivo_salvo})")
-                        posts_a_manter.append(item_cache)
-                        continue
-
-                print(f"  [NOVO POST] Baixando: {url}")
-                page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            ctx.add_cookies(cookies_playwright)
+            
+        page = ctx.new_page()
+        print(f"\nChecando feed de @{PERFIL}...")
+        page.goto(f"https://www.instagram.com/{PERFIL}/", wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(3000)
+        
+        urls = []
+        for _ in range(25):
+            anchors = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
+            for a in anchors:
+                h = a.get_attribute("href")
+                if h:
+                    clean = "https://www.instagram.com/" + h.split("?")[0].strip("/") + "/"
+                    if clean not in urls:
+                        urls.append(clean)
+            if len(urls) >= TOTAL_MIDIAS:
+                break
+            page.evaluate("window.scrollBy(0, 1500)")
+            page.wait_for_timeout(1000)
+        
+        # urls completo para fallback
+        print(f"Posts no feed: {len(urls)} identificados.")
+        
+        posts_a_manter = []
+        
+        for url in urls:
+            raw_sc = url.strip("/").split("/")[-1]; sc = raw_sc[:11] if len(raw_sc) > 11 and "_" not in raw_sc else raw_sc
+            out_prefix = f"temp_{sc}"
+            print(f"  [PROCESSANDO] {url}")
+            
+            caption = ""
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 page.wait_for_timeout(1000)
-
-                caption = ""
                 meta_tag = page.query_selector('meta[property="og:title"]')
                 if meta_tag:
                     caption = meta_tag.get_attribute("content") or ""
+            except Exception:
+                pass
 
-                post_temp_id = f"temp_{sc}"
-                tipo = "image"
-                arquivo_final = f"{post_temp_id}.jpg"
-
-                video_elem = page.query_selector("article video, main video")
-                if video_elem:
-                    ydl_opts = {
-                        'outtmpl': f'{post_temp_id}.%(ext)s',
-                        'format': 'bestvideo+bestaudio/best',
-                        'socket_timeout': 15,
-                        'retries': 3,
-                        'fragment_retries': 3,
-                        'quiet': True
-                    }
-                    if os.path.exists(COOKIES_FILE):
-                        ydl_opts['cookiefile'] = COOKIES_FILE
-                    try:
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                            ydl.download([url])
-                        for ext in [".mp4", ".mkv", ".webm"]:
-                            if os.path.exists(f"{post_temp_id}{ext}"):
-                                arquivo_final = f"{post_temp_id}{ext}"
-                                tipo = "video"
-                                break
-                    except Exception:
-                        tipo = "image"
-
-                if tipo != "video":
-                    sucesso_api = baixar_imagem_api_hd(post_temp_id, arquivo_final, COOKIES_FILE)
-                    if not sucesso_api:
-                        meta = page.query_selector('meta[property="og:image"]')
-                        img_url = meta.get_attribute("content") if meta else None
-                        if img_url:
-                            baixar_imagem_hd(img_url, arquivo_final)
-
-                if os.path.exists(arquivo_final):
-                    posts_a_manter.append({
-                        "id": sc,
-                        "url": url,
-                        "caption": caption,
-                        "tipo": tipo,
-                        "arquivo": arquivo_final, "media": arquivo_final, "media_file": arquivo_final, "video_file": arquivo_final, "imagem": arquivo_final,
-                        "badge": badge,
-                        "cor": cor,
-                        "perfil": usr
-                    })
-
+            # Classifica o tipo e baixa o arquivo correspondente
+            tipo_detectado, arquivo_gerado = baixar_midia_por_tipo(sc, out_prefix, cookies_dict)
+            
+            if arquivo_gerado and os.path.exists(arquivo_gerado):
+                if len(posts_a_manter) >= TOTAL_MIDIAS: break
+                posts_a_manter.append({
+                    "id": sc,
+                    "url": url,
+                    "caption": caption,
+                    "tipo": tipo_detectado,
+                    "arquivo": arquivo_gerado,
+                    "media": arquivo_gerado,
+                    "media_file": arquivo_gerado,
+                    "video_file": arquivo_gerado,
+                    "imagem": arquivo_gerado,
+                    "badge": BADGE_TEXTO,
+                    "cor": COR_TEMA,
+                    "perfil": PERFIL
+                })
+        
         browser.close()
 
-    if not posts_a_manter:
-        print("\nNenhum post localizado. Mantendo arquivos locais intactos!")
+    if len(posts_a_manter) < 6:
+        print(f"\n[SEGURANCA] Apenas {len(posts_a_manter)} midias coletadas. Mantendo arquivos atuais.")
         return
 
-    posts_finais = posts_a_manter[:TARGET_TOTAL]
-    dados_json_novo = []
-
     print("\nOrganizando arquivos de 1 a 12...")
-    arquivos_preservados = set()
-
-    for idx, item in enumerate(posts_finais, start=1):
-        ext = os.path.splitext(item["arquivo"])[1]
-        nome_slot = f"media_{idx}{ext}"
-
-        origem = item["arquivo"]
-        if origem != nome_slot:
-            if os.path.exists(nome_slot):
-                os.remove(nome_slot)
-            shutil.move(origem, nome_slot)
-            item["arquivo"] = nome_slot
-
-        arquivos_preservados.add(nome_slot)
-        dados_json_novo.append(item)
-
-    for arq in os.listdir("."):
-        if (arq.startswith("media_") or arq.startswith("temp_")) and (arq.endswith(".jpg") or arq.endswith(".mp4") or arq.endswith(".png")):
-            if arq not in arquivos_preservados:
+    json_final = []
+    
+    for idx, post in enumerate(posts_a_manter, 1):
+        ext = os.path.splitext(post["arquivo"])[1]
+        nome_definitivo = f"media_{idx}{ext}"
+        
+        if os.path.exists(post["arquivo"]):
+            if os.path.exists(nome_definitivo) and nome_definitivo != post["arquivo"]:
                 try:
-                    os.remove(arq)
+                    os.remove(nome_definitivo)
                 except Exception:
                     pass
+            try:
+                os.rename(post["arquivo"], nome_definitivo)
+            except Exception:
+                pass
+        
+        post["arquivo"] = nome_definitivo
+        post["media"] = nome_definitivo
+        post["media_file"] = nome_definitivo
+        post["video_file"] = nome_definitivo
+        post["imagem"] = nome_definitivo
+        json_final.append(post)
 
-    with open(DATA_JSON, "w", encoding="utf-8") as f:
-        json.dump(dados_json_novo, f, indent=2, ensure_ascii=False)
-
-    print(f"Concluido! {len(dados_json_novo)} midias prontas e data.json atualizado.")
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(json_final, f, indent=2, ensure_ascii=False)
+        
+    print(f"Concluido! {len(json_final)} midias identificadas e salvas com sucesso.")
 
 if __name__ == "__main__":
-    processar_mural()
+    main()
