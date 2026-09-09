@@ -1,17 +1,38 @@
-import os, sys, json, time, re, shutil
+﻿import os, sys, json, time, re, shutil
 import requests
 from playwright.sync_api import sync_playwright
 import yt_dlp
 
-# --- CONFIGURAÇÃO DE CONTAS ---
 ACCOUNTS = [
-    {"username": "l2_centrodetreinamento", "badge": "", "color": "#ff1744"}
+    {"username": "l2_centrodetreinamento", "badge": "L2 Treinamento", "color": "#8b5cf6"}
 ]
 
 TARGET_TOTAL = 12
 POSTS_PER_ACCOUNT = 12
 DATA_JSON = "data.json"
 COOKIES_FILE = "cookies.txt"
+
+def carregar_cookies_playwright():
+    if not os.path.exists(COOKIES_FILE):
+        return []
+    cookies = []
+    with open(COOKIES_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 7:
+                domain, _, path, secure, expires, name, value = parts[:7]
+                cookies.append({
+                    "name": name,
+                    "value": value,
+                    "domain": domain,
+                    "path": path,
+                    "secure": secure.lower() == "true",
+                    "expires": float(expires) if expires.isdigit() else -1
+                })
+    return cookies
 
 def extrair_shortcode(url):
     m = re.search(r'/(?:p|reel|tv)/([^/?#&]+)', url)
@@ -47,14 +68,23 @@ def baixar_imagem_hd(url, destino):
 def processar_mural():
     cache_local = carregar_cache()
     posts_a_manter = []
-    
-    print("=== INICIANDO VERIFICAÇÃO RÁPIDA (INCREMENTAL) ===")
-    
+    cookies_playwright = carregar_cookies_playwright()
+
+    print("=== INICIANDO SINCRONIZACAO (SESSAO AUTENTICADA) ===")
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
         )
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080}
+        )
+
+        if cookies_playwright:
+            context.add_cookies(cookies_playwright)
+
         page = context.new_page()
 
         for acc in ACCOUNTS:
@@ -62,10 +92,11 @@ def processar_mural():
             badge = acc.get("badge", "")
             cor = acc.get("color", "#ff1744")
             print(f"\nChecando feed de @{usr}...")
-            
+
             page.goto(f"https://www.instagram.com/{usr}/", wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(2000)
             urls_encontradas = []
-            
+
             for _ in range(8):
                 anchors = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
                 for a in anchors:
@@ -78,15 +109,14 @@ def processar_mural():
                 if len(urls_encontradas) >= POSTS_PER_ACCOUNT:
                     break
                 page.evaluate("window.scrollBy(0, 1000)")
-                page.wait_for_timeout(500)
+                page.wait_for_timeout(600)
 
             candidatos = urls_encontradas[:POSTS_PER_ACCOUNT]
             print(f"Posts no feed: {len(candidatos)} identificados.")
 
             for url in candidatos:
                 sc = extrair_shortcode(url)
-                
-                # CHECAGEM DE CACHE: Se ja existe e o arquivo existe localmente, pula!
+
                 if sc in cache_local:
                     item_cache = cache_local[sc]
                     arquivo_salvo = item_cache.get("arquivo")
@@ -95,7 +125,6 @@ def processar_mural():
                         posts_a_manter.append(item_cache)
                         continue
 
-                # Se nao esta no cache, baixa apenas o novo post
                 print(f"  [NOVO POST] Baixando: {url}")
                 page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 page.wait_for_timeout(1000)
@@ -109,7 +138,6 @@ def processar_mural():
                 tipo = "image"
                 arquivo_final = f"{post_temp_id}.jpg"
 
-                # Testa se eh video
                 video_elem = page.query_selector("article video, main video")
                 if video_elem:
                     ydl_opts = {
@@ -130,29 +158,27 @@ def processar_mural():
                                 arquivo_final = f"{post_temp_id}{ext}"
                                 tipo = "video"
                                 break
-                    except Exception as e:
-                        # Se não for vídeo ou falhar, trata como imagem HD
-                        tipo = "image" 
+                    except Exception:
+                        tipo = "image"
 
                 if tipo != "video":
                     img_url = None
                     meta_img = page.query_selector('meta[property="og:image"]')
                     if meta_img:
                         img_url = meta_img.get_attribute("content")
+
                     if not img_url:
-                        img = page.query_selector('article img[srcset], main img[srcset], img[style*="object-fit"]')
+                        img = page.query_selector('article img[srcset], main img[srcset]')
                         if img:
                             srcset = img.get_attribute("srcset")
                             if srcset:
-                                cand = [s.strip().split(" ")[0] for s in srcset.split(",")]
-                                img_url = cand[-1] if cand else None
+                                cand_img = [s.strip().split(" ")[0] for s in srcset.split(",")]
+                                img_url = cand_img[-1] if cand_img else None
                             if not img_url:
                                 img_url = img.get_attribute("src")
+
                     if img_url:
-                        try:
-                            baixar_imagem_hd(img_url, arquivo_final)
-                        except Exception as e:
-                            print(f"    Erro ao baixar: {e}")
+                        baixar_imagem_hd(img_url, arquivo_final)
 
                 if os.path.exists(arquivo_final):
                     posts_a_manter.append({
@@ -168,7 +194,10 @@ def processar_mural():
 
         browser.close()
 
-    # ORGANIZAÇÃO FINAL DOS TOP 12 SLOTS
+    if not posts_a_manter:
+        print("\nNenhum post localizado. Mantendo arquivos locais intactos!")
+        return
+
     posts_finais = posts_a_manter[:TARGET_TOTAL]
     dados_json_novo = []
 
@@ -178,7 +207,7 @@ def processar_mural():
     for idx, item in enumerate(posts_finais, start=1):
         ext = os.path.splitext(item["arquivo"])[1]
         nome_slot = f"media_{idx}{ext}"
-        
+
         origem = item["arquivo"]
         if origem != nome_slot:
             if os.path.exists(nome_slot):
@@ -189,7 +218,6 @@ def processar_mural():
         arquivos_preservados.add(nome_slot)
         dados_json_novo.append(item)
 
-    # Limpeza de arquivos antigos (ex: posts que sairam do top 12)
     for arq in os.listdir("."):
         if (arq.startswith("media_") or arq.startswith("temp_")) and (arq.endswith(".jpg") or arq.endswith(".mp4") or arq.endswith(".png")):
             if arq not in arquivos_preservados:
@@ -201,7 +229,7 @@ def processar_mural():
     with open(DATA_JSON, "w", encoding="utf-8") as f:
         json.dump(dados_json_novo, f, indent=2, ensure_ascii=False)
 
-    print(f"Concluído! {len(dados_json_novo)} mídias prontas e data.json atualizado.")
+    print(f"Concluido! {len(dados_json_novo)} midias prontas e data.json atualizado.")
 
 if __name__ == "__main__":
     processar_mural()
