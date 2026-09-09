@@ -135,18 +135,24 @@ def processar_mural():
                         tipo = "image" 
 
                 if tipo != "video":
-                    # Puxa imagem em HD
-                    img = page.query_selector('article img[srcset], article img[src]')
                     img_url = None
-                    if img:
-                        srcset = img.get_attribute("srcset")
-                        if srcset:
-                            cand_img = [s.strip().split(" ")[0] for s in srcset.split(",")]
-                            img_url = cand_img[-1] if cand_img else None
-                        if not img_url:
-                            img_url = img.get_attribute("src")
+                    meta_img = page.query_selector('meta[property="og:image"]')
+                    if meta_img:
+                        img_url = meta_img.get_attribute("content")
+                    if not img_url:
+                        img = page.query_selector('article img[srcset], main img[srcset], img[style*="object-fit"]')
+                        if img:
+                            srcset = img.get_attribute("srcset")
+                            if srcset:
+                                cand = [s.strip().split(" ")[0] for s in srcset.split(",")]
+                                img_url = cand[-1] if cand else None
+                            if not img_url:
+                                img_url = img.get_attribute("src")
                     if img_url:
-                        baixar_imagem_hd(img_url, arquivo_final)
+                        try:
+                            baixar_imagem_hd(img_url, arquivo_final)
+                        except Exception as e:
+                            print(f"    Erro ao baixar: {e}")
 
                 if os.path.exists(arquivo_final):
                     posts_a_manter.append({

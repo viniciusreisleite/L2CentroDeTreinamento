@@ -62,34 +62,37 @@ def main():
             page.goto(f"https://www.instagram.com/{username}/reels/", wait_until="domcontentloaded", timeout=60000)
             time.sleep(6)
 
-            for _ in range(5):
-                page.mouse.wheel(0, 1000)
-                time.sleep(2)
+            # Scroll dinâmico até atingir a meta de 12 posts
+            tentativas_scroll = 0
+            while len(reels_urls) < target_count and tentativas_scroll < 20:
+                elements = page.query_selector_all("a[href*='/reel/'], a[href*='/p/']")
+                for el in elements:
+                    is_pinned = False
+                    try:
+                        pin_elem = el.query_selector("svg[aria-label*='Pin'], svg[aria-label*='Fixado'], svg[title*='Pin'], svg[title*='Fixado']")
+                        if pin_elem:
+                            is_pinned = True
+                    except Exception:
+                        pass
 
-            elements = page.query_selector_all("a[href*='/reel/'], a[href*='/p/']")
-            
-            for el in elements:
-                is_pinned = False
-                try:
-                    pin_elem = el.query_selector("svg[aria-label*='Pin'], svg[aria-label*='Fixado'], svg[title*='Pin'], svg[title*='Fixado']")
-                    if pin_elem:
-                        is_pinned = True
-                except Exception:
-                    pass
+                    if is_pinned:
+                        continue
 
-                if is_pinned:
-                    print("📌 Post fixado ignorado.")
-                    continue
+                    href = el.get_attribute("href")
+                    if href:
+                        full_url = f"https://www.instagram.com{href}" if href.startswith("/") else href
+                        clean_url = full_url.split("?")[0]
+                        if clean_url not in reels_urls:
+                            reels_urls.append(clean_url)
+                            if len(reels_urls) >= target_count:
+                                break
 
-                href = el.get_attribute("href")
-                if href:
-                    full_url = f"https://www.instagram.com{href}" if href.startswith("/") else href
-                    clean_url = full_url.split("?")[0]
-                    if clean_url not in reels_urls:
-                        reels_urls.append(clean_url)
-                
                 if len(reels_urls) >= target_count:
                     break
+
+                page.mouse.wheel(0, 1500)
+                time.sleep(2.5)
+                tentativas_scroll += 1
 
         except Exception as e:
             print(f"Aviso durante navegação: {e}")
