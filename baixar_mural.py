@@ -8,11 +8,8 @@ import urllib.request
 import yt_dlp
 from playwright.sync_api import sync_playwright
 
-PERFIS = [
-    {"username": "loja_somzao", "badge": "LOJA SOMZÃO", "color": "#ff1744"},
-    {"username": "estetica_somzao", "badge": "ESTÉTICA AUTOMOTIVA", "color": "#00e5ff"}
-]
-TARGET_POR_PERFIL = 6
+USERNAME = "l2_centrodetreinamento"
+TARGET_COUNT = 12
 
 def progresso_hook(d):
     if d['status'] == 'downloading':
@@ -76,7 +73,7 @@ def main():
     cookie_file = "cookies.txt" if os.path.exists("cookies.txt") else None
     playwright_cookies = carregar_cookies_locais()
 
-    coletados_por_perfil = {}
+    posts_urls = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -92,75 +89,61 @@ def main():
             context.add_cookies(playwright_cookies)
 
         page = context.new_page()
+        print(f"Acessando feed de @{USERNAME}...")
 
-        for config in PERFIS:
-            usr = config["username"]
-            posts_urls = []
-            print(f"\nAcessando feed de @{usr}...")
+        try:
+            page.goto(f"https://www.instagram.com/{USERNAME}/", wait_until="domcontentloaded", timeout=60000)
+            time.sleep(4)
 
-            try:
-                page.goto(f"https://www.instagram.com/{usr}/", wait_until="domcontentloaded", timeout=60000)
-                time.sleep(4)
+            for scroll_step in range(6):
+                raw_items = page.evaluate("""() => {
+                    const links = Array.from(document.querySelectorAll("a[href*='/p/'], a[href*='/reel/']"));
+                    return links.map(el => {
+                        const rect = el.getBoundingClientRect();
+                        const isPinned = !!el.querySelector("svg[aria-label*='Pin'], svg[aria-label*='Fixado'], svg[title*='Pin'], svg[title*='Fixado']");
+                        return {
+                            href: el.getAttribute('href'),
+                            top: rect.top + window.scrollY,
+                            left: rect.left,
+                            isPinned: isPinned
+                        };
+                    });
+                }""")
 
-                for scroll_step in range(6):
-                    raw_items = page.evaluate("""() => {
-                        const links = Array.from(document.querySelectorAll("a[href*='/p/'], a[href*='/reel/']"));
-                        return links.map(el => {
-                            const rect = el.getBoundingClientRect();
-                            const isPinned = !!el.querySelector("svg[aria-label*='Pin'], svg[aria-label*='Fixado']");
-                            return {
-                                href: el.getAttribute('href'),
-                                top: rect.top + window.scrollY,
-                                left: rect.left,
-                                isPinned: isPinned
-                            };
-                        });
-                    }""")
+                raw_items.sort(key=lambda x: (x['top'], x['left']))
 
-                    raw_items.sort(key=lambda x: (x['top'], x['left']))
+                for item in raw_items:
+                    if item.get("isPinned"):
+                        continue
+                    href = item.get("href")
+                    if href:
+                        full_url = f"https://www.instagram.com{href}" if href.startswith("/") else href
+                        clean_url = full_url.split("?")[0]
+                        if clean_url not in posts_urls:
+                            posts_urls.append(clean_url)
 
-                    for item in raw_items:
-                        if item.get("isPinned"):
-                            continue
-                        href = item.get("href")
-                        if href:
-                            full_url = f"https://www.instagram.com{href}" if href.startswith("/") else href
-                            clean_url = full_url.split("?")[0]
-                            if clean_url not in posts_urls:
-                                posts_urls.append(clean_url)
+                if len(posts_urls) >= TARGET_COUNT:
+                    break
 
-                    if len(posts_urls) >= TARGET_POR_PERFIL:
-                        break
+                page.mouse.wheel(0, 800)
+                time.sleep(2)
 
-                    page.mouse.wheel(0, 800)
-                    time.sleep(2)
+        except Exception as e:
+            print(f"Aviso durante navegacao inicial: {e}")
 
-            except Exception as e:
-                print(f"Aviso ao coletar @{usr}: {e}")
+        posts_urls = posts_urls[:TARGET_COUNT]
+        print(f"Total de posts cronologicos identificados: {len(posts_urls)}")
 
-            coletados_por_perfil[usr] = posts_urls[:TARGET_POR_PERFIL]
-            print(f"Posts identificados em @{usr}: {len(coletados_por_perfil[usr])}")
-
-        # Intercala os posts dos dois perfis
-        fila_unificada = []
-        max_len = max(len(coletados_por_perfil.get(c["username"], [])) for c in PERFIS)
-        for i in range(max_len):
-            for c in PERFIS:
-                lista = coletados_por_perfil.get(c["username"], [])
-                if i < len(lista):
-                    fila_unificada.append({
-                        "url": lista[i],
-                        "perfil": c["username"],
-                        "badge": c["badge"],
-                        "color": c["color"]
-                    })
+        if not posts_urls:
+            print("Nenhum post foi identificado.")
+            browser.close()
+            return
 
         posts_data = []
         allowed_files = []
 
-        for idx, item in enumerate(fila_unificada, start=1):
-            post_url = item["url"]
-            print(f"\n[{idx}/{len(fila_unificada)}] Processando (@{item['perfil']}): {post_url}")
+        for idx, post_url in enumerate(posts_urls, start=1):
+            print(f"\n[{idx}/{len(posts_urls)}] Processando: {post_url}")
             is_video = "/reel/" in post_url
             slide_index = 1
             caption = ""
@@ -170,9 +153,11 @@ def main():
                 page.goto(post_url, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(3)
 
+                # 1. Tenta pegar a legenda via meta tag og:description (mais estavel)
                 try:
                     meta_desc = page.locator('meta[property="og:description"]').get_attribute("content")
                     if meta_desc:
+                        # O Instagram formata como: "179 likes, 17 comments - Perfil on Date: "Texto da legenda""
                         if '": "' in meta_desc:
                             caption = meta_desc.split('": "', 1)[1].rstrip('"')
                         elif ': "' in meta_desc:
@@ -182,11 +167,13 @@ def main():
                 except Exception:
                     pass
 
+                # 2. Fallback: pega o texto dentro do post via DOM
                 if not caption:
                     caption_elem = page.query_selector("article h1, h1, div[class*='_a9zs'], span[class*='_aacl']")
                     if caption_elem:
                         caption = caption_elem.inner_text().strip()
 
+                # 3. Fallback: pega o atributo alt da imagem
                 if not caption:
                     img_com_alt = page.query_selector("article img[alt]")
                     if img_com_alt:
@@ -194,46 +181,17 @@ def main():
                         if "Foto de" in alt_txt or "Photo by" in alt_txt:
                             caption = alt_txt
 
-                # 1. Deteccao por Meta Tags (servidor/SSR)
-                try:
-                    og_type = page.locator('meta[property="og:type"]').get_attribute("content") or ""
-                    og_video = page.locator('meta[property="og:video"]').get_attribute("content") or ""
-                    if "video" in og_type.lower() or bool(og_video):
-                        is_video = True
-                except Exception:
-                    pass
-
-                # 2. Deteccao por Elemento no DOM
-                if not is_video:
-                    if page.query_selector("video, article video, div[role='dialog'] video"):
-                        is_video = True
-
-                if not is_video:
-                    try:
-                        with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl_chk:
-                            info_chk = ydl_chk.extract_info(post_url, download=False)
-                            entries_chk = info_chk.get("entries", [])
-                            if entries_chk:
-                                for num_s, slide_s in enumerate(entries_chk, start=1):
-                                    vcodec_s = slide_s.get("vcodec")
-                                    ext_s = slide_s.get("ext")
-                                    if (vcodec_s and vcodec_s != "none") or ext_s == "mp4":
-                                        is_video = True
-                                        slide_index = num_s
-                                        break
-                            elif (info_chk.get("vcodec") and info_chk.get("vcodec") != "none") or info_chk.get("ext") == "mp4":
-                                is_video = True
-                    except Exception:
-                        pass
-
-                if not is_video:
+                video_elem = page.query_selector("video")
+                if video_elem:
+                    is_video = True
+                elif not is_video:
                     img_elem = page.query_selector("article img, div[role='dialog'] img, img[style*='object-fit']")
                     if img_elem:
                         srcset = img_elem.get_attribute("srcset")
                         if srcset:
                             candidatos = []
-                            for p_part in srcset.split(","):
-                                partes = p_part.strip().split(" ")
+                            for item in srcset.split(","):
+                                partes = item.strip().split(" ")
                                 if len(partes) == 2:
                                     w = int(partes[1].replace("w", ""))
                                     candidatos.append((w, partes[0]))
@@ -245,7 +203,7 @@ def main():
                             image_download_url = img_elem.get_attribute("src") or ""
 
             except Exception as e:
-                print(f"Aviso no post #{idx}: {e}")
+                print(f"Aviso ao inspecionar post #{idx}: {e}")
 
             if is_video:
                 output_filename = f"media_{idx}.mp4"
@@ -272,21 +230,18 @@ def main():
                     ]
                 }
 
-                sucesso_video = False
+                video_sucesso = False
                 try:
                     with yt_dlp.YoutubeDL(opts_video) as ydl:
                         ydl.download([post_url])
                     if os.path.exists(output_filename) and os.path.getsize(output_filename) > 1000:
-                        sucesso_video = True
+                        video_sucesso = True
                 except Exception as e:
-                    print(f"Aviso download de video: {e}")
+                    print(f"Aviso: nao e video unico ({e}). Alternando para foto...")
 
-                if sucesso_video:
+                if video_sucesso:
                     posts_data.append({
                         "id": idx,
-                        "perfil": item["perfil"],
-                        "badge": item["badge"],
-                        "badge_color": item["color"],
                         "type": "video",
                         "url": post_url,
                         "media": output_filename,
@@ -295,74 +250,67 @@ def main():
                         "caption": caption,
                         "updated_at": time.strftime("%d/%m/%Y as %H:%M")
                     })
-                    print(f"Salvo (video): {output_filename} | @{item['perfil']}")
+                    print(f"Salvo (video): {output_filename} | Legenda: {caption[:30]}...")
                 else:
-                    if os.path.exists(output_filename):
-                        try: os.remove(output_filename)
-                        except Exception: pass
-                    allowed_files.remove(output_filename)
-                    output_filename = f"media_{idx}.jpg"
-                    allowed_files.append(output_filename)
-
-                    baixou = False
+                    # Fallback imediato para imagem/carrossel
+                    output_img = f"media_{idx}.jpg"
+                    if output_filename in allowed_files:
+                        allowed_files.remove(output_filename)
+                    allowed_files.append(output_img)
+                    downloaded = False
                     if image_download_url:
                         try:
                             req = urllib.request.Request(image_download_url, headers={'User-Agent': 'Mozilla/5.0'})
-                            with urllib.request.urlopen(req, timeout=20) as resp, open(output_filename, 'wb') as out_f:
-                                out_f.write(resp.read())
-                            baixou = True
-                        except Exception: pass
-
-                    if not baixou:
+                            with urllib.request.urlopen(req, timeout=20) as response, open(output_img, 'wb') as out_f:
+                                out_f.write(response.read())
+                            downloaded = True
+                        except Exception:
+                            pass
+                    if not downloaded:
                         try:
-                            node = page.query_selector("article img, div[role='dialog'] img")
-                            if node:
-                                node.screenshot(path=output_filename)
-                                baixou = True
-                        except Exception: pass
-
+                            img_n = page.query_selector("article img, img[style*='object-fit']")
+                            if img_n:
+                                img_n.screenshot(path=output_img)
+                                downloaded = True
+                        except Exception:
+                            pass
                     posts_data.append({
                         "id": idx,
-                        "perfil": item["perfil"],
-                        "badge": item["badge"],
-                        "badge_color": item["color"],
                         "type": "image",
                         "url": post_url,
-                        "media": output_filename,
-                        "media_file": output_filename,
-                        "video_file": output_filename,
+                        "media": output_img,
+                        "media_file": output_img,
+                        "image_file": output_img,
                         "caption": caption,
                         "updated_at": time.strftime("%d/%m/%Y as %H:%M")
                     })
-                    print(f"Salvo (foto fallback): {output_filename} | @{item['perfil']}")
+                    print(f"Salvo (imagem fallback): {output_img} | Legenda: {caption[:30]}...")
 
             else:
                 output_filename = f"media_{idx}.jpg"
                 allowed_files.append(output_filename)
 
-                baixou = False
+                downloaded = False
                 if image_download_url:
                     try:
                         req = urllib.request.Request(image_download_url, headers={'User-Agent': 'Mozilla/5.0'})
-                        with urllib.request.urlopen(req, timeout=20) as resp, open(output_filename, 'wb') as out_f:
-                            out_f.write(resp.read())
-                        baixou = True
+                        with urllib.request.urlopen(req, timeout=20) as response, open(output_filename, 'wb') as out_file:
+                            out_file.write(response.read())
+                        downloaded = True
                     except Exception as e:
                         print(f"Erro ao baixar imagem: {e}")
 
-                if not baixou:
+                if not downloaded:
                     try:
-                        node = page.query_selector("article img, div[role='dialog'] img")
-                        if node:
-                            node.screenshot(path=output_filename)
-                            baixou = True
-                    except Exception: pass
+                        img_node = page.query_selector("article img, img[style*='object-fit']")
+                        if img_node:
+                            img_node.screenshot(path=output_filename)
+                            downloaded = True
+                    except Exception:
+                        pass
 
                 posts_data.append({
                     "id": idx,
-                    "perfil": item["perfil"],
-                    "badge": item["badge"],
-                    "badge_color": item["color"],
                     "type": "image",
                     "url": post_url,
                     "media": output_filename,
@@ -371,7 +319,7 @@ def main():
                     "caption": caption,
                     "updated_at": time.strftime("%d/%m/%Y as %H:%M")
                 })
-                print(f"Salvo (foto): {output_filename} | @{item['perfil']}")
+                print(f"Salvo (foto): {output_filename} | Legenda: {caption[:30]}...")
 
         browser.close()
 
@@ -380,7 +328,7 @@ def main():
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(posts_data, f, ensure_ascii=False, indent=2)
 
-    print("\nConcluido! data.json atualizado com os dois perfis integrados.")
+    print("\nConcluido! data.json atualizado com legendas completas.")
 
 if __name__ == "__main__":
     main()
