@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 PERFIS = [
     {"username": "ultrasaolourenco", "badge": "LOJA SOMZÃO", "color": "#ff1744"}
 ]
-TARGET_POR_PERFIL = 6
+TARGET_POR_PERFIL = 12
 
 def progresso_hook(d):
     if d['status'] == 'downloading':
@@ -101,7 +101,7 @@ def main():
                 page.goto(f"https://www.instagram.com/{usr}/", wait_until="domcontentloaded", timeout=60000)
                 time.sleep(4)
 
-                for scroll_step in range(6):
+                for scroll_step in range(12):
                     raw_items = page.evaluate("""() => {
                         const links = Array.from(document.querySelectorAll("a[href*='/p/'], a[href*='/reel/']"));
                         return links.map(el => {
