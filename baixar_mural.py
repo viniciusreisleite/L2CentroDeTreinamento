@@ -110,7 +110,7 @@ def processar_mural():
                 arquivo_final = f"{post_temp_id}.jpg"
 
                 # Testa se eh video
-                video_elem = page.query_selector("video")
+                video_elem = page.query_selector("article video, main video")
                 if video_elem:
                     ydl_opts = {
                         'outtmpl': f'{post_temp_id}.%(ext)s',
@@ -131,7 +131,8 @@ def processar_mural():
                                 tipo = "video"
                                 break
                     except Exception as e:
-                        print(f"    Erro ao extrair vídeo: {e}")
+                        # Se não for vídeo ou falhar, trata como imagem HD
+                        tipo = "image" 
 
                 if tipo != "video":
                     # Puxa imagem em HD

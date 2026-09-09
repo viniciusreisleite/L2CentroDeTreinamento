@@ -15,7 +15,7 @@ git diff-index --quiet HEAD || git commit -m "Atualizacao mural"
 git push origin main
 
 echo.
-echo 3. Aguardando 35 segundos para conclusao do deploy no Pages...
-timeout /t 35 /nobreak
+
+
 
 echo Concluido!
