@@ -1,5 +1,49 @@
 ﻿import os, sys, json, time, re, shutil
-import requests
+
+def shortcode_to_media_id(shortcode):
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    media_id = 0
+    for letter in shortcode:
+        media_id = (media_id * 64) + alphabet.index(letter)
+    return str(media_id)
+
+def baixar_imagem_api_hd(shortcode, out_path, cookies_file):
+    cookies_dict = {}
+    if os.path.exists(cookies_file):
+        with open(cookies_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'): continue
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    cookies_dict[parts[5]] = parts[6]
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'X-IG-App-ID': '936619743392459',
+        'Accept': '*/*'
+    }
+    try:
+        mid = shortcode_to_media_id(shortcode)
+        api_url = f'https://www.instagram.com/api/v1/media/{mid}/info/'
+        r = requests.get(api_url, headers=headers, cookies=cookies_dict, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            items = data.get('items', [])
+            if items:
+                item = items[0]
+                if 'carousel_media' in item and len(item['carousel_media']) > 0:
+                    cand = item['carousel_media'][0].get('image_versions2', {}).get('candidates', [])
+                else:
+                    cand = item.get('image_versions2', {}).get('candidates', [])
+                if cand:
+                    img_url = cand[0]['url']
+                    img_data = requests.get(img_url, timeout=20).content
+                    with open(out_path, 'wb') as f:
+                        f.write(img_data)
+                    return True
+    except Exception:
+        pass
+    return False
 from playwright.sync_api import sync_playwright
 import yt_dlp
 
@@ -162,23 +206,12 @@ def processar_mural():
                         tipo = "image"
 
                 if tipo != "video":
-                    img_url = None
-                    meta_img = page.query_selector('meta[property="og:image"]')
-                    if meta_img:
-                        img_url = meta_img.get_attribute("content")
-
-                    if not img_url:
-                        img = page.query_selector('article img[srcset], main img[srcset]')
-                        if img:
-                            srcset = img.get_attribute("srcset")
-                            if srcset:
-                                cand_img = [s.strip().split(" ")[0] for s in srcset.split(",")]
-                                img_url = cand_img[-1] if cand_img else None
-                            if not img_url:
-                                img_url = img.get_attribute("src")
-
-                    if img_url:
-                        baixar_imagem_hd(img_url, arquivo_final)
+                    sucesso_api = baixar_imagem_api_hd(post_temp_id, arquivo_final, COOKIES_FILE)
+                    if not sucesso_api:
+                        meta = page.query_selector('meta[property="og:image"]')
+                        img_url = meta.get_attribute("content") if meta else None
+                        if img_url:
+                            baixar_imagem_hd(img_url, arquivo_final)
 
                 if os.path.exists(arquivo_final):
                     posts_a_manter.append({
