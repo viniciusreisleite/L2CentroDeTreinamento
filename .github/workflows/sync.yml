@@ -1,8 +1,6 @@
 name: Sincronizar Instagram - L2 Centro de Treinamento
 
 on:
-  schedule:
-    - cron: '0 */3 * * *'
   workflow_dispatch:
 
 permissions:
